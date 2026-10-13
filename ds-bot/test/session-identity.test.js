@@ -38,6 +38,12 @@ async function drain(stream) {
   return chunks
 }
 
+// DeepSeek Harness lets a model call only `run_code` directly, so a group relay arrives as
+// a run_code call that reaches the `group_relay` tool.
+const isRelay = chunk => chunk.type === 'tool-call-delta'
+  && chunk.name === 'run_code'
+  && String(chunk.argumentsDelta).includes('tools.group_relay(')
+
 // `ctx.llm.stream` runs the plugin's `llm/stream` listeners in order, as DSH does,
 // and then a route that turns down a request without a Session. `respond` gives the
 // text of each answer the route lets through.
@@ -145,7 +151,7 @@ test('an image in a group is read for the group, and the group still relays its 
   assert.deepEqual(bench.requests.map(request => [request.model, request.sessionId]), [['vision', 'r1']])
 
   const chunks = await drain(ctx.llm.stream({ provider: 'deepseek', model: 'v4', sessionId: 'r1', messages: [userText('Discuss the picture')] }))
-  assert.ok(chunks.some(chunk => chunk.type === 'tool-call-delta' && chunk.name === 'group_relay'))
+  assert.ok(chunks.some(isRelay))
   assert.equal(bench.requests.length, 1)
 })
 
@@ -160,7 +166,7 @@ test('the Session hooks pass DS Bot\'s own requests through, and still act on a 
 
   const relay = hook(/relayOrPass/)
   assert.equal(relay(own('r1', [userText('Read this')]), pass), passed)
-  assert.ok((await drain(relay(round('r1', [userText('Read this')]), pass))).some(chunk => chunk.name === 'group_relay'))
+  assert.ok((await drain(relay(round('r1', [userText('Read this')]), pass))).some(isRelay))
 
   const handoff = [{ role: 'user', source: { kind: 'bot', handoff: true }, content: [{ type: 'text', text: 'Handoff note' }] }]
   const acknowledge = hook(/acknowledge/)

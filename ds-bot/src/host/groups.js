@@ -673,9 +673,15 @@ export function install(rt) {
         return
       }
       const id = `toolu_relay_${randomUUID().replace(/-/g, '')}`
+      // DeepSeek Harness lets only `run_code` be called directly, so the relay travels as a
+      // one-line program that reaches the `group_relay` tool.
+      const args = JSON.stringify({
+        code: 'return await tools.group_relay({})',
+        description: 'Relay the latest user message to this group chat',
+      })
       yield { type: 'block-start', index: 0, blockType: 'tool-call' }
-      yield { type: 'tool-call-delta', index: 0, id, name: 'group_relay', argumentsDelta: '{}' }
-      yield { type: 'block-end', index: 0, block: { type: 'tool-call', id, name: 'group_relay', arguments: '{}' } }
+      yield { type: 'tool-call-delta', index: 0, id, name: 'run_code', argumentsDelta: args }
+      yield { type: 'block-end', index: 0, block: { type: 'tool-call', id, name: 'run_code', arguments: args } }
       yield { type: 'finish', reason: { kind: 'tool-calls' } }
     })()
   })
